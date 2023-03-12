@@ -78,10 +78,10 @@ You can keep a reference to your instructions and update them::
             super(MyWidget, self).__init__(**kwargs)
             with self.canvas:
                 self.rect = Rectangle(pos=self.pos, size=self.size)
-    
+
             self.bind(pos=self.update_rect)
             self.bind(size=self.update_rect)
-    
+
         def update_rect(self, *args):
             self.rect.pos = self.pos
             self.rect.size = self.size
@@ -97,7 +97,7 @@ Or you can clean your canvas and start fresh::
             self.bind(pos=self.draw_my_stuff)
             self.bind(size=self.draw_my_stuff)
 
-        def draw_my_stuff(self):
+        def draw_my_stuff(self, *args):
             self.canvas.clear()
 
             with self.canvas:

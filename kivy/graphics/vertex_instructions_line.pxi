@@ -14,8 +14,12 @@ DEF LINE_MODE_RECTANGLE = 3
 DEF LINE_MODE_ROUNDED_RECTANGLE = 4
 DEF LINE_MODE_BEZIER = 5
 
+from kivy.cache import Cache
 from kivy.graphics.stencil_instructions cimport StencilUse, StencilUnUse, StencilPush, StencilPop
 import itertools
+
+# register graphics texture cache
+Cache.register('kv.graphics.texture')
 
 cdef float PI = <float>3.1415926535
 
@@ -64,7 +68,7 @@ cdef class Line(VertexInstruction):
         `dashes`: list of ints
             List of [ON length, offset, ON length, offset, ...]. E.g. ``[2,4,1,6,8,2]``
             would create a line with the first dash length 2 then an offset of 4 then
-            a dash lenght of 1 then an offset of 6 and so on. Defaults to ``[]``.
+            a dash length of 1 then an offset of 6 and so on. Defaults to ``[]``.
             Changing this makes it dashed and overrides `dash_length` and `dash_offset`.
         `width`: float
             Width of the line, defaults to 1.0.
@@ -723,7 +727,8 @@ cdef class Line(VertexInstruction):
             else:
                 self._points = list(points)
 
-            self.flag_update()
+            self._mode = LINE_MODE_POINTS
+            self.flag_data_update()
 
     property dash_length:
         '''Property for getting/setting the length of the dashes in the curve
@@ -737,7 +742,7 @@ cdef class Line(VertexInstruction):
             if value < 0:
                 raise GraphicException('Invalid dash_length value, must be >= 0')
             self._dash_length = value
-            self.flag_update()
+            self.flag_data_update()
 
     property dash_offset:
         '''Property for getting/setting the offset between the dashes in the curve
@@ -751,14 +756,14 @@ cdef class Line(VertexInstruction):
             if value < 0:
                 raise GraphicException('Invalid dash_offset value, must be >= 0')
             self._dash_offset = value
-            self.flag_update()
+            self.flag_data_update()
 
     property dashes:
         '''Property for getting/setting ``dashes``.
 
         List of [ON length, offset, ON length, offset, ...]. E.g. ``[2,4,1,6,8,2]``
         would create a line with the first dash length 2 then an offset of 4 then
-        a dash lenght of 1 then an offset of 6 and so on.
+        a dash length of 1 then an offset of 6 and so on.
 
         .. versionadded:: 1.11.0
         '''
@@ -767,7 +772,7 @@ cdef class Line(VertexInstruction):
 
         def __set__(self, value):
             self._dash_list = list(value)
-            self.flag_update()
+            self.flag_data_update()
 
     property width:
         '''Determine the width of the line, defaults to 1.0.
@@ -781,7 +786,7 @@ cdef class Line(VertexInstruction):
             if value <= 0:
                 raise GraphicException('Invalid width value, must be > 0')
             self._width = value
-            self.flag_update()
+            self.flag_data_update()
 
     property cap:
         '''Determine the cap of the line, defaults to 'round'. Can be one of
@@ -806,7 +811,7 @@ cdef class Line(VertexInstruction):
                 self._cap = LINE_CAP_ROUND
             else:
                 self._cap = LINE_CAP_NONE
-            self.flag_update()
+            self.flag_data_update()
 
     property joint:
         '''Determine the join of the line, defaults to 'round'. Can be one of
@@ -836,7 +841,7 @@ cdef class Line(VertexInstruction):
                 self._joint = LINE_JOINT_MITER
             else:
                 self._joint = LINE_JOINT_NONE
-            self.flag_update()
+            self.flag_data_update()
 
     property cap_precision:
         '''Number of iteration for drawing the "round" cap, defaults to 10.
@@ -852,7 +857,7 @@ cdef class Line(VertexInstruction):
             if value < 1:
                 raise GraphicException('Invalid cap_precision value, must be >= 1')
             self._cap_precision = int(value)
-            self.flag_update()
+            self.flag_data_update()
 
     property joint_precision:
         '''Number of iteration for drawing the "round" joint, defaults to 10.
@@ -868,7 +873,7 @@ cdef class Line(VertexInstruction):
             if value < 1:
                 raise GraphicException('Invalid joint_precision value, must be >= 1')
             self._joint_precision = int(value)
-            self.flag_update()
+            self.flag_data_update()
 
     property close:
         '''If True, the line will be closed.
@@ -881,7 +886,7 @@ cdef class Line(VertexInstruction):
 
         def __set__(self, value):
             self._close = int(bool(value))
-            self.flag_update()
+            self.flag_data_update()
 
     property ellipse:
         '''Use this property to build an ellipse, without calculating the
@@ -922,7 +927,7 @@ cdef class Line(VertexInstruction):
                         '{0} instead of 4, 6 or 7.'.format(len(args)))
             self._mode_args = tuple(args)
             self._mode = LINE_MODE_ELLIPSE
-            self.flag_update()
+            self.flag_data_update()
 
     cdef void prebuild_ellipse(self):
         cdef double x, y, w, h, angle_start = 0, angle_end = 360
@@ -939,7 +944,7 @@ cdef class Line(VertexInstruction):
             segments += 2
         else:
             x = y = w = h = 0
-            assert(0)
+            assert 0
 
         if angle_end > angle_start:
             angle_dir = 1
@@ -1005,7 +1010,7 @@ cdef class Line(VertexInstruction):
                         '{0} instead of 3, 5 or 6.'.format(len(args)))
             self._mode_args = tuple(args)
             self._mode = LINE_MODE_CIRCLE
-            self.flag_update()
+            self.flag_data_update()
 
     cdef void prebuild_circle(self):
         cdef double x, y, r, angle_start = 0, angle_end = 360
@@ -1022,7 +1027,7 @@ cdef class Line(VertexInstruction):
             segments += 1
         else:
             x = y = r = 0
-            assert(0)
+            assert 0
 
         if angle_end > angle_start:
             angle_dir = 1
@@ -1073,7 +1078,7 @@ cdef class Line(VertexInstruction):
                         '{0} instead of 4.'.format(len(args)))
             self._mode_args = tuple(args)
             self._mode = LINE_MODE_RECTANGLE
-            self.flag_update()
+            self.flag_data_update()
 
     cdef void prebuild_rectangle(self):
         cdef double x, y, width, height
@@ -1089,7 +1094,7 @@ cdef class Line(VertexInstruction):
             x, y, width, height = args
         else:
             x = y = width = height = 0
-            assert(0)
+            assert 0
 
         self._points = [x, y, x + width, y, x + width, y + height, x, y + height]
         self._close = 1
@@ -1127,7 +1132,7 @@ cdef class Line(VertexInstruction):
                         '{0} not in (5, 6, 8, 9)'.format(len(args)))
             self._mode_args = tuple(args)
             self._mode = LINE_MODE_ROUNDED_RECTANGLE
-            self.flag_update()
+            self.flag_data_update()
 
     cdef void prebuild_rounded_rectangle(self):
         cdef float a, px, py, x, y, w, h, c1, c2, c3, c4
@@ -1210,7 +1215,7 @@ cdef class Line(VertexInstruction):
                         'Invalid bezier value: {0!r}'.format(args))
             self._mode_args = tuple(args)
             self._mode = LINE_MODE_BEZIER
-            self.flag_update()
+            self.flag_data_update()
 
     cdef void prebuild_bezier(self):
         cdef double x, y, l
@@ -1251,7 +1256,7 @@ cdef class Line(VertexInstruction):
             if value < 1:
                 raise GraphicException('Invalid bezier_precision value, must be >= 1')
             self._bezier_precision = int(value)
-            self.flag_update()
+            self.flag_data_update()
 
 
 cdef class SmoothLine(Line):
@@ -1281,9 +1286,12 @@ cdef class SmoothLine(Line):
         self.texture = self.premultiplied_texture()
 
     def premultiplied_texture(self):
-        texture = Texture.create(size=(4, 1), colorfmt="rgba")
-        texture.add_reload_observer(self._smooth_reload_observer)
-        self._smooth_reload_observer(texture)
+        texture = Cache.get('kv.graphics.texture', 'smoothline')
+        if not texture:
+            texture = Texture.create(size=(4, 1), colorfmt="rgba")
+            texture.add_reload_observer(self._smooth_reload_observer)
+            self._smooth_reload_observer(texture)
+            Cache.append('kv.graphics.texture', 'smoothline', texture)
         return texture
 
     cpdef _smooth_reload_observer(self, texture):
@@ -1385,7 +1393,7 @@ cdef class SmoothLine(Line):
             osin1 = sin(a1) * owidth
             ocos2 = cos(a2) * owidth
             osin2 = sin(a2) * owidth
-            print 'angle diff', ad_angle
+            print('angle diff', ad_angle)
             '''
             #l = width
             #ol = owidth
@@ -1410,7 +1418,7 @@ cdef class SmoothLine(Line):
                     bx + cos(la2) * width,
                     by + sin(la2) * width,
                     &rx, &ry) == 0:
-                    #print 'ERROR LINE INTERSECTION 1'
+                    # print('ERROR LINE INTERSECTION 1')
                     pass
 
                 l = <float>sqrt((ax - rx) ** 2 + (ay - ry) ** 2)
@@ -1425,7 +1433,7 @@ cdef class SmoothLine(Line):
                     bx + cos(ra2) * owidth,
                     by + sin(ra2) * owidth,
                     &rx, &ry) == 0:
-                    #print 'ERROR LINE INTERSECTION 2'
+                    # print('ERROR LINE INTERSECTION 2')
                     pass
 
                 ol = <float>sqrt((ax - rx) ** 2 + (ay - ry) ** 2)
@@ -1537,7 +1545,7 @@ cdef class SmoothLine(Line):
             tindices[17] = i7
             tindices = tindices + 18
 
-        #print 'tindices', <long>tindices, <long>indices, (<long>tindices - <long>indices) / sizeof(unsigned short)
+        # print('tindices', <long>tindices, <long>indices, (<long>tindices - <long>indices) / sizeof(unsigned short))
 
 
         self.batch.set_data(vertices, <int>vcount, indices, <int>icount)
@@ -1556,5 +1564,5 @@ cdef class SmoothLine(Line):
             if value <= 0:
                 raise GraphicException('Invalid width value, must be > 0')
             self._owidth = value
-            self.flag_update()
+            self.flag_data_update()
 

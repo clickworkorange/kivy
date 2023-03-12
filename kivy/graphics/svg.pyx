@@ -17,7 +17,7 @@ Load an SVG as a graphics instruction::
         svg = Svg("image.svg")
 
 There is no widget that can display Svg directly, you have to make your own for
-now. Check the `examples/svg` for more informations.
+now. Check the `examples/svg` for more information.
 '''
 
 __all__ = ("Svg", )
@@ -289,7 +289,7 @@ class Gradient(object):
     def __init__(self, element, svg):
         self.element = element
         self.stops = {}
-        for e in element.getiterator():
+        for e in element:
             if e.tag.endswith('stop'):
                 style = parse_style(e.get('style', ''))
                 color = parse_color(e.get('stop-color'), svg.current_color)
@@ -363,10 +363,10 @@ class RadialGradient(Gradient):
 
 
 cdef class Svg(RenderContext):
-    """Svg class. See module for more informations about the usage.
+    """Svg class. See module for more information about the usage.
     """
 
-    def __init__(self, source, anchor_x=0, anchor_y=0,
+    def __init__(self, source=None, anchor_x=0, anchor_y=0,
                  bezier_points=BEZIER_POINTS, circle_points=CIRCLE_POINTS,
                  color=None):
         '''
@@ -385,8 +385,13 @@ cdef class Svg(RenderContext):
             subdivide circular and elliptic arcs. Defaults to 10.
         :param color the default color to use for Svg elements that specify "currentColor"
 
+        .. note:: if you want to use SVGs from string, you can parse the source yourself
+            using `from xml.etree.cElementTree import fromstring` and pass the result to 
+            Svg().set_tree(). This will trigger the rendering of the Svg - as an alternative
+            to assigning a filepath to Svg.source. This is also viable to trigger reloading.
+
         .. versionchanged:: 2.0.0
-            Parameter `filename` changed to `source`.
+            Parameter `filename` changed to `source` and made optional.
         '''
 
         super(Svg, self).__init__(fs=SVG_FS, vs=SVG_VS,
@@ -420,7 +425,8 @@ cdef class Svg(RenderContext):
                 b"\xff\xff\xff\xff\xff\xff\xff\x00", colorfmt="rgba")
 
         self._source = None
-        self.source = source
+        if source:
+            self.source = source
 
 
     @property
@@ -510,13 +516,23 @@ cdef class Svg(RenderContext):
             fd = open(filename, 'rb')
         try:
             #save the tree for later reloading
-            self.tree = parse(fd)
-            self.reload()
+            self.set_tree(parse(fd))
             end = time()
             Logger.debug("Svg: Loaded {} in {:.2f}s".format(filename, end - start))
         finally:
             self._source = filename
             fd.close()
+
+    def set_tree(self, tree):
+        '''
+        sets the tree used to render the Svg and triggers reloading.
+	
+        :param xml.etree.cElementTree tree: the tree parsed from the SVG source
+
+        .. versionadded:: 2.0.0
+        '''
+        self.tree = tree
+        self.reload()
 
     cdef void reload(self) except *:
             # parse tree
@@ -552,7 +568,7 @@ cdef class Svg(RenderContext):
             self.width = w
 
         self.opacity = 1.0
-        for e in root.getchildren():
+        for e in root:
             self.parse_element(e)
 
     cdef parse_element(self, e):
@@ -691,7 +707,7 @@ cdef class Svg(RenderContext):
         elif e.tag.endswith('radialGradient'):
             self.gradients[e.get('id')] = RadialGradient(e, self)
 
-        for c in e.getchildren():
+        for c in e:
             self.parse_element(c)
 
         self.transform = oldtransform
@@ -1129,7 +1145,7 @@ cdef class Svg(RenderContext):
         self.last_mesh.add_triangle_strip(vertices, vindex, count, mode)
 
     cdef void push_line_mesh(self, float[:] path, fill, Matrix transform, float width):
-        # Tentative to use smooth line, doesn't work completly yet.
+        # Tentative to use smooth line, doesn't work completely yet.
         # Caps and joint are missing
         cdef int index, vindex = 0, odd = 0, i
         cdef float ax, ay, bx, _by, r = 0, g = 0, b = 0, a = 0

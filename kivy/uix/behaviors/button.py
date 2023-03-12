@@ -161,7 +161,7 @@ class ButtonBehavior(object):
     def on_touch_up(self, touch):
         if touch.grab_current is not self:
             return super(ButtonBehavior, self).on_touch_up(touch)
-        assert(self in touch.ud)
+        assert self in touch.ud
         touch.ungrab(self)
         self.last_touch = touch
 
@@ -189,7 +189,11 @@ class ButtonBehavior(object):
         '''Trigger whatever action(s) have been bound to the button by calling
         both the on_press and on_release callbacks.
 
-        This simulates a quick button press without using any touch events.
+        This is similar to a quick button press without using any touch events,
+        but note that like most kivy code, this is not guaranteed to be safe to
+        call from external threads. If needed use
+        :class:`Clock <kivy.clock.Clock>` to safely schedule this function and
+        the resulting callbacks to be called from the main thread.
 
         Duration is the length of the press in seconds. Pass 0 if you want
         the action to happen instantly.

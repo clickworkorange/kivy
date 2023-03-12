@@ -1,15 +1,11 @@
 .. _packaging_ios:
 
-Create a package for IOS
+Create a package for iOS
 ========================
 
-.. note::
+The overall process for creating a package for iOS can be explained in 4 steps:
 
-    Currently, kivy-iOS builds packages with Python 2.7 and 3.7.
-
-The overall process for creating a package for IOS can be explained in 4 steps:
-
-#. :ref:`Compile the distribution` (python + modules for IOS)
+#. :ref:`Compile the distribution` (python + modules for iOS)
 #. :ref:`Create an Xcode project` (and link your source code)
 #. :ref:`Update the Xcode project`
 #. :ref:`Customize`
@@ -18,17 +14,16 @@ Prerequisites
 -------------
 
 You need to install some dependencies, like Cython, autotools, etc. We
-encourage you to use `Homebrew <http://mxcl.github.com/homebrew/>`_ to install
+encourage you to use `Homebrew <https://brew.sh>`_ to install
 those dependencies:
 
 .. parsed-literal::
 
-    brew install autoconf automake libtool pkg-config
-    brew link libtool
-    sudo easy_install pip
-    sudo pip install |cython_install|
+    $ brew install autoconf automake libtool pkg-config
+    $ brew link libtool
+    $ pip install |cython_install|
 
-For more detail, see :ref:`IOS Prerequisites <packaging_ios_prerequisites>`.
+For more detail, see :ref:`iOS Prerequisites <packaging_ios_prerequisites>`.
 Just ensure that everything is ok before starting the second step!
 
 .. _Compile the distribution:
@@ -38,12 +33,10 @@ Compile the distribution
 
 Open a terminal, and type::
 
-    $ git clone git://github.com/kivy/kivy-ios
-    $ cd kivy-ios
-    $ ./toolchain.py build kivy
+    $ pip install kivy-ios
+    $ toolchain build kivy
 
-Most of the python distribution is packed into `python27.zip`. If you
-experience any issues, please refer to our
+If you experience any issues, please refer to our
 `user group <https://groups.google.com/forum/#!forum/kivy-users>`_ or the
 `kivy-ios project page <https://github.com/kivy/kivy-ios>`_.
 
@@ -56,11 +49,11 @@ Before proceeding to the next step, ensure your application entry point is a fil
 named `main.py`.
 
 We provide a script that creates an initial Xcode project to start with. In the
-command line below, replace `test` with your project name. It must be a
+command line below, replace `title` with your project name. It must be a
 name without any spaces or illegal characters::
 
-    $ ./toolchain.py create <title> <app_directory>
-    $ ./toolchain.py create Touchtracer ~/code/kivy/examples/demo/touchtracer
+    $ toolchain create <title> <app_directory>
+    $ toolchain create Touchtracer ~/code/kivy/examples/demo/touchtracer
 
 .. Note::
     You must use a fully qualified path to your application directory.
@@ -86,11 +79,11 @@ Update the Xcode project
 Let's say you want to add numpy to your project but you did not compile it
 prior to creating your XCode project. First, ensure it is built::
 
-    $ ./toolchain.py build numpy
+    $ toolchain build numpy
 
 Then, update your Xcode project::
 
-    $ ./toolchain.py update touchtracer-ios
+    $ toolchain update touchtracer-ios
 
 All the libraries / frameworks necessary to run all the compiled recipes will be
 added to your Xcode project.
@@ -127,28 +120,19 @@ FAQ
 Application quit abnormally!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-By default, all the print statements to the console and files are ignored. If
-you have an issue when running your application, you can activate the log by
-commenting out this line in `main.m`::
+In debug mode, all the print statements are sent to the Xcode console.
+Looking and grep'ing these logs is highly encouraged. You'll probably find
+that you missed to build/install a required dependency. Not your case?
+Feel free to ask on our Discord ``support`` channels.
 
-    putenv("KIVY_NO_CONSOLELOG=1");
-
-Then you should see all the Kivy logging on the Xcode console.
-
-How can Apple accept a python app ?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How can Apple accept a python app?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We managed to merge the app binary with all the libraries into a single binary,
 called libpython. This means all binary modules are loaded beforehand, so
 nothing is dynamically loaded.
 
-Have you already submited a Kivy application to the App store ?
+Have you already submitted a Kivy application to the App store?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes, check:
-
-- `Defletouch on iTunes <http://itunes.apple.com/us/app/deflectouch/id505729681>`_,
-- `ProcessCraft on iTunes <http://itunes.apple.com/us/app/processcraft/id526377075>`_
-
-For a more complete list, visit the
-`Kivy wiki <https://github.com/kivy/kivy/wiki/List-of-Kivy-Projects>`_.
+Yes, absolutely. `Kivy Apps in the Apple App Store <https://github.com/kivy/kivy/wiki/List-of-Kivy-Projects#kivy-apps-in-the-apple-app-store>`_.

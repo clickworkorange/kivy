@@ -21,7 +21,7 @@ On desktop, this defaults to::
 Therefore, if your user is named "tito", the file will be here:
 
 - Windows: ``C:\Users\tito\.kivy\config.ini``
-- OS X: ``/Users/tito/.kivy/config.ini``
+- macOS: ``/Users/tito/.kivy/config.ini``
 - Linux: ``/home/tito/.kivy/config.ini``
 
 On Android, this defaults to::
@@ -52,7 +52,7 @@ To create a separate configuration file you can simply use these commands::
 
 When a local configuration of single ``.ini`` file isn't enough, e.g. when
 you want to have separate environment for `garden`, kivy logs and other things,
-you'll need to change the the ``KIVY_HOME`` environment variable in your
+you'll need to change the ``KIVY_HOME`` environment variable in your
 application to get desired result::
 
     import os

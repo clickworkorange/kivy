@@ -4,7 +4,6 @@ __all__ = ('AnimatedButton')
 from kivy.factory import Factory
 from kivy.uix.label import Label
 from kivy.uix.image import Image
-from kivy.graphics import *
 from kivy.properties import StringProperty, OptionProperty, \
                             ObjectProperty, BooleanProperty
 
@@ -82,7 +81,7 @@ class AnimatedButton(Label):
     def on_touch_up(self, touch):
         if touch.grab_current is not self:
             return
-        assert(repr(self) in touch.ud)
+        assert repr(self) in touch.ud
         touch.ungrab(self)
         _animdelay = self.img._coreimage.anim_delay
         self.img.source = self.background_normal

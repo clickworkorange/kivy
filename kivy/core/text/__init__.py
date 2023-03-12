@@ -48,7 +48,7 @@ provider currently implements it).
 .. warning:: This feature requires the Pango text provider.
 
 Font contexts can be created automatically by :class:`kivy.uix.label.Label` or
-:class:`kivy.uix.textinput.TextInput`; if a non-existant context is used in
+:class:`kivy.uix.textinput.TextInput`; if a non-existent context is used in
 one of these classes, it will be created automatically, or if a font file is
 specified without a context (this creates an isolated context, without
 support for fallback).
@@ -235,7 +235,8 @@ class LabelBase(object):
         unicode_errors='replace',
         font_hinting='normal', font_kerning=True, font_blended=True,
         outline_width=None, outline_color=None, font_context=None,
-        font_features=None, base_direction=None, text_language=None,
+        font_features=None, base_direction=None, font_direction='ltr',
+        font_script_name='Latin', text_language=None,
         **kwargs):
 
         # Include system fonts_dir in resource paths.
@@ -258,11 +259,13 @@ class LabelBase(object):
                    'font_context': font_context,
                    'font_features': font_features,
                    'base_direction': base_direction,
+                   'font_direction': font_direction,
+                   'font_script_name': font_script_name,
                    'text_language': text_language}
 
         kwargs_get = kwargs.get
         options['color'] = color or (1, 1, 1, 1)
-        options['outline_color'] = outline_color or (0, 0, 0)
+        options['outline_color'] = outline_color or (0, 0, 0, 1)
         options['padding'] = kwargs_get('padding', (0, 0))
         if not isinstance(options['padding'], (list, tuple)):
             options['padding'] = (options['padding'], options['padding'])
@@ -304,6 +307,9 @@ class LabelBase(object):
         :func:`kivy.resources.resource_find`. If fn_italic/fn_bold are None,
         fn_regular will be used instead.
         '''
+
+        if fn_regular is None:
+            raise ValueError("font_regular cannot be None")
 
         fonts = []
 
@@ -568,7 +574,7 @@ class LabelBase(object):
     def clear_texture(self):
         self._render_begin()
         data = self._render_end()
-        assert(data)
+        assert data
         if data is not None and data.width > 1:
             self.texture.blit_data(data)
         return
@@ -679,7 +685,7 @@ class LabelBase(object):
 
         # get data from provider
         data = self._render_end()
-        assert(data)
+        assert data
         self.options = old_opts
 
         # If the text is 1px width, usually, the data is black.
@@ -784,18 +790,7 @@ class LabelBase(object):
             texture.ask_update(self._texture_fill)
 
     def _get_text(self):
-        if PY2:
-            try:
-                if isinstance(self._text, unicode):
-                    return self._text
-                return self._text.decode('utf8')
-            except AttributeError:
-                # python 3 support
-                return str(self._text)
-            except UnicodeDecodeError:
-                return self._text
-        else:
-            return self._text
+        return self._text
 
     def _set_text(self, text):
         if text != self._text:

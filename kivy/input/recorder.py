@@ -246,7 +246,7 @@ class Recorder(EventDispatcher):
             EventLoop.remove_input_provider(self)
             return
         if not exists(self.filename):
-            Logger.error('Recorder: Unable to found %r file, play aborted.' % (
+            Logger.error('Recorder: Unable to find %r file, play aborted.' % (
                 self.filename))
             return
 
@@ -283,7 +283,7 @@ class Recorder(EventDispatcher):
         dt = time() - self.play_time
         while self.play_data:
             event = self.play_data[0]
-            assert(len(event) == 4)
+            assert len(event) == 4
             if event[0] > dt:
                 return
 

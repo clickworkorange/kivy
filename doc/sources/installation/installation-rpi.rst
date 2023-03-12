@@ -3,178 +3,144 @@
 Installation on Raspberry Pi
 ============================
 
-You can install Kivy manually (recommended), or you can download and boot KivyPie on the
-Raspberry Pi. Both options are described below.
+To install Kivy on the RPi using ``pip``, please follow the main :ref:`installation guide<installation-canonical>`.
 
+Installation components
+-----------------------
 
-Manual installation (On Raspbian Jessie/Stretch)
-------------------------------------------------
+Following, are additional information linked to from some of the steps in the
+main :ref:`pip installation guide<installation-canonical>`, specific to the RPi.
 
-In the following instructions, for Python 3, replace `python` with `python3`.
+.. _install-python-rpi:
 
-#. Install the dependencies::
+Installing Python
+^^^^^^^^^^^^^^^^^
+
+Python and python-pip must be installed from the package manager:
+
+Raspbian Jessie/Stretch/Buster
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Using apt::
 
     sudo apt update
-    sudo apt install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-       pkg-config libgl1-mesa-dev libgles2-mesa-dev \
-       python-setuptools libgstreamer1.0-dev git-core \
-       gstreamer1.0-plugins-{bad,base,good,ugly} \
-       gstreamer1.0-{omx,alsa} python-dev libmtdev-dev \
-       xclip xsel libjpeg-dev
+    sudo apt install python3-setuptools git-core python3-dev
 
-#. Install pip dependencies:
-
-    .. parsed-literal::
-
-        python -m pip install --upgrade --user pip setuptools
-        python -m pip install --upgrade --user |cython_install| pillow
-
-#. Install Kivy to Python globally
-
-   You can install it like a normal python package with::
-
-    # to get the last release from pypi
-    python -m pip install --user kivy
-
-    # to install master
-    python -m pip install --user https://github.com/kivy/kivy/archive/master.zip
-    
-    # or clone locally then pip install
-    git clone https://github.com/kivy/kivy
-    cd kivy
-    python -m pip install --user .
-
-   Or build and use kivy inplace in a editable install (best for development)::
-
-    git clone https://github.com/kivy/kivy
-    cd kivy
-
-    python -m pip install --user -e .
-    # every time you change any cython files remember to manually call:
-    make
-    # or to recompile all files
-    make force
-
-.. note::
-
-    On versions of kivy prior to 1.10.1, Mesa library naming changes can result
-    in "Unable to find any valuable Window provider" errors. If you experience
-    this issue, please upgrade or consult `ticket #5360.
-    <https://github.com/kivy/kivy/issues/5360>`_
-
-Manual installation (On Raspbian Wheezy)
-----------------------------------------
-
-#. Add APT sources for Gstreamer 1.0 in `/etc/apt/sources.list`::
-
-    deb http://vontaene.de/raspbian-updates/ . main
-
-#. Add APT key for vontaene.de::
-
-    gpg --recv-keys 0C667A3E
-    gpg -a --export 0C667A3E | sudo apt-key add -
-
-#. Install the dependencies::
-
-    sudo apt-get update
-    sudo apt-get install libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-       pkg-config libgl1-mesa-dev libgles2-mesa-dev \
-       python-setuptools libgstreamer1.0-dev git-core \
-       gstreamer1.0-plugins-{bad,base,good,ugly} \
-       gstreamer1.0-{omx,alsa} python-dev
-
-#. Install pip from source::
-
-    wget https://raw.github.com/pypa/pip/master/contrib/get-pip.py
-    sudo python get-pip.py
-
-#. Install Cython from sources (debian packages are outdated):
-
-    .. parsed-literal::
-
-        sudo pip install |cython_install|
-
-#. Install Kivy globally on your system::
-
-    sudo pip install git+https://github.com/kivy/kivy.git@master
-
-#. Or build and use kivy inplace (best for development)::
-
-    git clone https://github.com/kivy/kivy
-    cd kivy
-
-    make
-    echo "export PYTHONPATH=$(pwd):\$PYTHONPATH" >> ~/.profile
-    source ~/.profile
-
-Manual installation (On Arch Linux ARM)
-------------------------------------------------
-
-#. Install the dependencies::
-
-    sudo pacman -Syu
-    sudo pacman -S sdl2 sdl2_gfx sdl2_image sdl2_net sdl2_ttf sdl2_mixer python-setuptools
-
-    Note: python-setuptools needs to be installed through pacman or it will result with conflicts!
-
-#. Install pip from source::
-
-    wget https://bootstrap.pypa.io/get-pip.py
-    or curl -O https://bootstrap.pypa.io/get-pip.py
-    sudo python get-pip.py
-
-#. Install a new enough version of Cython:
-
-    .. parsed-literal::
-
-        sudo pip install -U |cython_install|
-
-#. Install Kivy globally on your system::
-
-    sudo pip install git+https://github.com/kivy/kivy.git@master
-
-#. Or build and use kivy inplace (best for development)::
-
-    git clone https://github.com/kivy/kivy
-    cd kivy
-    python setup.py install
+Arch Linux ARM
+~~~~~~~~~~~~~~
 
 Images to use::
 
-    http://raspex.exton.se/?p=859 (recommended)  
+    http://raspex.exton.se/?p=859 (recommended)
     https://archlinuxarm.org/
 
-.. note::
+Using pacman::
 
-    On versions of kivy prior to 1.10.1, Mesa library naming changes can result
-    in "Unable to find any valuable Window provider" errors. If you experience
-    this issue, please upgrade or consult `ticket #5360.
-    <https://github.com/kivy/kivy/issues/5360>`_
+    sudo pacman -Syu
+    # Note: python-setuptools needs to be installed through pacman or it will result with conflicts!
+    sudo pacman -S python-setuptools
 
-KivyPie distribution
---------------------
+    # Install pip from source
+    wget https://bootstrap.pypa.io/get-pip.py
+    # or curl -O https://bootstrap.pypa.io/get-pip.py
+    sudo python get-pip.py
 
-KivyPie is a compact and lightweight Raspbian based distribution that comes
-with Kivy installed and ready to run. It is the result of applying the manual
-installation steps described above, with a few more extra tools. You can
-download the image from http://kivypie.mitako.eu/kivy-download.html and boot
-it on a Raspberry PI.
+.. _install-source-rpi:
+
+Source installation Dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To install Kivy from source, please follow the :ref:`installation guide<kivy-wheel-install>` until you reach the
+:ref:`Kivy install step<kivy-source-install>` and then install the dependencies below
+before continuing.
+
+Raspbian Jessie/Stretch/Buster
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Using apt::
+
+    sudo apt update
+    sudo apt install pkg-config libgl1-mesa-dev libgles2-mesa-dev \
+       libgstreamer1.0-dev \
+       gstreamer1.0-plugins-{bad,base,good,ugly} \
+       gstreamer1.0-{omx,alsa} libmtdev-dev \
+       xclip xsel libjpeg-dev
+
+Cross-Compilation for Raspberry Pi 1-3 headless installation on Raspbian Buster
+*******************************************************************************
+
+The Raspberry OS project uses `pi-gen` project to create bootable images for Raspberry PI.
+
+Kivy determines automatically the sub-packages to build based on the environment it is compiled within. By default, the `egl_rpi` renderer that uses the (now deprecated but still useful) DISPMANX API is only compiled when running on a Raspberry Pi.
+In order to build Kivy in such `pi-gen` environment, the auto-detection of the Raspberry Pi hardware version needs to be disabled.
+
+When cross-compiling using e.g. `pi-gen`, the build system can be forced into compiling for Raspberry Pi with `egl_rpi` support by setting the environment variable `KIVY_RPI_VERSION` to any number < 4, e.g. `3`.
+
+The install command then looks something like this::
+
+    apt install build-essential libraspberrypi-dev raspberrypi-kernel-headers
+    KIVY_RPI_VERSION=3 python -m pip install "kivy[base]" kivy_examples --no-binary kivy
+
+Please note that the `egl_rpi` window handler is not supported on Raspberry Pi 4 and higher.
+The existing version check will refuse to compile the `egl_rpi` provider when detecting or forcing the Raspberry Pi version to 4 or higher.
+
+Raspberry Pi 4 headless installation on Raspbian Buster
+*******************************************************
+
+If you run Kivy from the console and not from a desktop environment, you need to compile SDL2
+with the ``kmsdrm`` backend. This is not the default, so you need add a few extra requirements, and 
+then edit the build script located at `tools/build_linux_dependencies.sh` accordingly.
+
+Extra install requirements::
+
+    sudo apt-get install libfreetype6-dev libgl1-mesa-dev libgles2-mesa-dev libdrm-dev libgbm-dev libudev-dev libasound2-dev liblzma-dev libjpeg-dev libtiff-dev libwebp-dev git build-essential
+    sudo apt-get install gir1.2-ibus-1.0 libdbus-1-dev libegl1-mesa-dev libibus-1.0-5 libibus-1.0-dev libice-dev libsm-dev libsndio-dev libwayland-bin libwayland-dev libxi-dev libxinerama-dev libxkbcommon-dev libxrandr-dev libxss-dev libxt-dev libxv-dev x11proto-randr-dev x11proto-scrnsaver-dev x11proto-video-dev x11proto-xinerama-dev
+
+Extra flags for `configure` step of ``-- Build SDL2`` build phase ::
+
+    --enable-video-kmsdrm --disable-video-opengl --disable-video-x11 --disable-video-rpi
+
+Hardware acceleration
+---------------------
+
+If you are getting output similar to this when running your app::
+
+    [INFO   ] GL: OpenGL vendor <b'VMware, Inc.'>
+    [INFO   ] GL: OpenGL renderer <b'llvmpipe (LLVM 9.0.1, 128 bits)'>
+
+Then it means that the renderer is **NOT** hardware accelerated. This can be fixed by adding your user to the render group::
+
+    sudo adduser "$USER" render
+
+You will then see an output similar to this::
+
+    [INFO   ] GL: OpenGL vendor <b'Broadcom'>
+    [INFO   ] GL: OpenGL renderer <b'V3D 4.2'>
 
 
-Running the demo
-----------------
+Raspberry Pi window provider and GL backend
+-------------------------------------------
 
-Go to your `kivy/examples` folder, you'll have tons of demo you could try.
+By default the Raspberry Pi 1-3 will use the ``egl_rpi`` window provider and the ``gl`` GL backend.
 
-You could start the showcase::
+Since the ``egl_rpi`` window provider is not available on the Raspberry Pi 4 it uses the ``sdl2`` window provider and the ``sdl2`` GL backend by default.
 
-    cd kivy/examples/demo/showcase
-    python main.py
+The window provider and GL backend can be changed at runtime by setting the `KIVY_WINDOW`_ and `KIVY_GL_BACKEND`_ environmental variables.
 
-3d monkey demo is also fun too see::
+The table below shows the supported combinations of window provider and GL backend on the 4 platforms:
 
-    cd kivy/examples/3Drendering
-    python main.py
++------------------------------------+-----------------------------------+-------+-------+-------+-------+
+| Window provider (`KIVY_WINDOW`_\=) | GL backend (`KIVY_GL_BACKEND`_\=) | RPi 1 | RPi 2 | RPi 3 | RPi 4 |
++====================================+===================================+=======+=======+=======+=======+
+| sdl2                               | sdl2/gl                           | y     | y     | y     | y     |
++------------------------------------+-----------------------------------+-------+-------+-------+-------+
+| x11                                | gl                                | y     | y     | y     | y     |
++------------------------------------+-----------------------------------+-------+-------+-------+-------+
+| egl_rpi                            | gl                                | y     | y     | y     | n     |
++------------------------------------+-----------------------------------+-------+-------+-------+-------+
+
+.. _KIVY_WINDOW: https://kivy.org/doc/stable/guide/environment.html#restrict-core-to-specific-implementation
+.. _KIVY_GL_BACKEND: https://kivy.org/doc/stable/guide/environment.html#restrict-core-to-specific-implementation
 
 Change the default screen to use
 --------------------------------
@@ -183,7 +149,7 @@ You can set an environment variable named `KIVY_BCM_DISPMANX_ID` in order to
 change the display used to run Kivy. For example, to force the display to be
 HDMI, use::
 
-    KIVY_BCM_DISPMANX_ID=2 python main.py
+    KIVY_BCM_DISPMANX_ID=2 python3 main.py
 
 Check :ref:`environment` to see all the possible values.
 
@@ -201,13 +167,3 @@ configure Kivy to use it as an input source. To do this, edit the file
     hid_%(name)s = probesysfs,provider=hidinput
 
 For more information about configuring Kivy, see :ref:`configure kivy`
-
-Where to go ?
--------------
-
-We made few games using GPIO / physical input we got during Pycon 2013: a
-button and a tilt. Checkout the https://github.com/kivy/piki. You will need to
-adapt the GPIO pin in the code.
-
-A video to see what we were doing with it:
-http://www.youtube.com/watch?v=NVM09gaX6pQ

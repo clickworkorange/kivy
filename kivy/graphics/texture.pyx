@@ -59,7 +59,7 @@ For example, to blit immutable bytes data::
     buf = [int(x * 255 / size) for x in range(size)]
 
     # then, convert the array to a ubyte string
-    buf = b''.join(map(chr, buf))
+    buf = bytes(buf)
 
     # then blit the buffer
     texture.blit_buffer(buf, colorfmt='rgb', bufferfmt='ubyte')
@@ -684,7 +684,8 @@ cdef class Texture:
 
         '''
         for cb in self.observers[:]:
-            if cb.is_dead() or cb() is callback:
+            method = cb()
+            if method is None or method is callback:
                 self.observers.remove(cb)
                 continue
 
@@ -1120,10 +1121,11 @@ cdef class Texture:
 
         # then update content again
         for callback in self.observers[:]:
-            if callback.is_dead():
+            method = callback()
+            if method is None:
                 self.observers.remove(callback)
                 continue
-            callback()(self)
+            method(self)
 
     def save(self, filename, flipped=True, fmt=None):
         '''Save the texture content to a file. Check
@@ -1137,7 +1139,7 @@ cdef class Texture:
         .. versionchanged:: 1.8.0
 
             Parameter `flipped` added, defaults to True. All the OpenGL Texture
-            are readed from bottom / left, it need to be flipped before saving.
+            are read from bottom / left, it need to be flipped before saving.
             If you don't want to flip the image, set flipped to False.
 
         .. versionchanged:: 1.11.0
@@ -1352,10 +1354,11 @@ cdef class TextureRegion(Texture):
         # then update content again
         self.bind()
         for callback in self.observers[:]:
-            if callback.is_dead():
+            method = callback()
+            if method is None:
                 self.observers.remove(callback)
                 continue
-            callback()(self)
+            method(self)
 
     def ask_update(self, callback):
         # redirect to owner

@@ -9,6 +9,7 @@ if "--build_examples" in sys.argv:
     build_examples = True
     sys.argv.remove("--build_examples")
 
+from kivy.utils import pi_version
 from copy import deepcopy
 import os
 from os.path import join, dirname, sep, exists, basename, isdir
@@ -17,9 +18,7 @@ from distutils.command.build_ext import build_ext
 from distutils.version import LooseVersion
 from distutils.sysconfig import get_python_inc
 from collections import OrderedDict
-from time import time, sleep
-from subprocess import check_output, CalledProcessError
-from datetime import datetime
+from time import sleep
 from sysconfig import get_paths
 from pathlib import Path
 import logging
@@ -43,38 +42,7 @@ LooseVersion.__eq__ = ver_equal
 
 def get_description():
     with open(join(dirname(__file__), 'README.md'), 'rb') as fileh:
-        return fileh.read().decode("utf8")
-
-
-def get_version(filename='kivy/version.py'):
-    VERSION = kivy.__version__
-    epoch = int(environ.get('SOURCE_DATE_EPOCH', time()))
-    DATE = datetime.utcfromtimestamp(epoch).strftime('%Y%m%d')
-    try:
-        GIT_REVISION = check_output(
-            ['git', 'rev-parse', 'HEAD']
-        ).strip().decode('ascii')
-    except (CalledProcessError, OSError, IOError, FileNotFoundError) as e:
-        # CalledProcessError has no errno
-        errno = getattr(e, 'errno', None)
-        if errno != 2 and 'CalledProcessError' not in repr(e):
-            raise
-        GIT_REVISION = "Unknown"
-
-    cnt = (
-        "# THIS FILE IS GENERATED FROM KIVY SETUP.PY\n"
-        "__version__ = '%(version)s'\n"
-        "__hash__ = '%(hash)s'\n"
-        "__date__ = '%(date)s'\n"
-    )
-
-    with open(filename, 'w') as f:
-        f.write(cnt % {
-            'version': VERSION,
-            'hash': GIT_REVISION,
-            'date': DATE
-        })
-    return VERSION
+        return fileh.read().decode("utf8").replace('\r\n', '\n')
 
 
 def getoutput(cmd, env=None):
@@ -95,12 +63,23 @@ def getoutput(cmd, env=None):
 def pkgconfig(*packages, **kw):
     flag_map = {'-I': 'include_dirs', '-L': 'library_dirs', '-l': 'libraries'}
     lenviron = None
-    pconfig = join(sys.prefix, 'libs', 'pkgconfig')
 
-    if isdir(pconfig):
+    if platform == 'win32':
+        pconfig = join(sys.prefix, 'libs', 'pkgconfig')
+        if isdir(pconfig):
+            lenviron = environ.copy()
+            lenviron['PKG_CONFIG_PATH'] = '{};{}'.format(
+                environ.get('PKG_CONFIG_PATH', ''), pconfig)
+
+    if KIVY_DEPS_ROOT and platform != 'win32':
         lenviron = environ.copy()
-        lenviron['PKG_CONFIG_PATH'] = '{};{}'.format(
-            environ.get('PKG_CONFIG_PATH', ''), pconfig)
+        lenviron["PKG_CONFIG_PATH"] = "{}:{}".format(
+            environ.get("PKG_CONFIG_PATH", ""),
+            join(
+                KIVY_DEPS_ROOT, "dist", "lib", "pkgconfig"
+            ),
+        )
+
     cmd = 'pkg-config --libs --cflags {}'.format(' '.join(packages))
     results = getoutput(cmd, lenviron).split()
     for token in results:
@@ -112,17 +91,29 @@ def pkgconfig(*packages, **kw):
     return kw
 
 
+def get_isolated_env_paths():
+    try:
+        # sdl2_dev is installed before setup.py is run, when installing from
+        # source due to pyproject.toml. However, it is installed to a
+        # pip isolated env, which we need to add to compiler
+        import kivy_deps.sdl2_dev as sdl2_dev
+    except ImportError:
+        return [], []
+
+    root = os.path.abspath(join(sdl2_dev.__path__[0], '../../../..'))
+    includes = [join(root, 'Include')] if isdir(join(root, 'Include')) else []
+    libs = [join(root, 'libs')] if isdir(join(root, 'libs')) else []
+    return includes, libs
+
+
 # -----------------------------------------------------------------------------
+
 # Determine on which platform we are
 
-platform = sys.platform
+build_examples = build_examples or \
+    os.environ.get('KIVY_BUILD_EXAMPLES', '0') == '1'
 
-# Detect 32/64bit for OSX (http://stackoverflow.com/a/1405971/798575)
-if sys.platform == 'darwin':
-    if sys.maxsize > 2 ** 32:
-        osx_arch = 'x86_64'
-    else:
-        osx_arch = 'i386'
+platform = sys.platform
 
 # Detect Python for android project (http://github.com/kivy/python-for-android)
 ndkplatform = environ.get('NDKPLATFORM')
@@ -133,9 +124,16 @@ if kivy_ios_root is not None:
     platform = 'ios'
 # proprietary broadcom video core drivers
 if exists('/opt/vc/include/bcm_host.h'):
-    platform = 'rpi'
+    used_pi_version = pi_version
+    # Force detected Raspberry Pi version for cross-builds, if needed
+    if 'KIVY_RPI_VERSION' in environ:
+        used_pi_version = int(environ['KIVY_RPI_VERSION'])
+    # The proprietary broadcom video core drivers are not available on the
+    # Raspberry Pi 4
+    if (used_pi_version or 4) < 4:
+        platform = 'rpi'
 # use mesa video core drivers
-if environ.get('VIDEOCOREMESA', None):
+if environ.get('VIDEOCOREMESA', None) == '1':
     platform = 'vc'
 mali_paths = (
     '/usr/lib/arm-linux-gnueabihf/libMali.so',
@@ -147,6 +145,22 @@ if any((exists(path) for path in mali_paths)):
 # Needed when cross-compiling
 if environ.get('KIVY_CROSS_PLATFORM'):
     platform = environ.get('KIVY_CROSS_PLATFORM')
+
+# If the user has specified a KIVY_DEPS_ROOT, use that as the root for
+# (ATM only SDL) dependencies. Otherwise, use the default locations.
+KIVY_DEPS_ROOT = os.environ.get('KIVY_DEPS_ROOT', None)
+
+# if KIVY_DEPS_ROOT is None and platform is linux or darwin show a warning
+# message, because using a system provided SDL2 is not recommended.
+# (will be shown only in verbose mode)
+if KIVY_DEPS_ROOT is None and platform in ('linux', 'darwin'):
+    print("###############################################")
+    print("WARNING: KIVY_DEPS_ROOT is not set, using system provided SDL")
+    print("which is not recommended as it may be incompatible with Kivy.")
+    print("Please build dependencies from source via the provided script")
+    print("and set KIVY_DEPS_ROOT to the root of the dependencies directory.")
+    print("###############################################")
+
 
 # -----------------------------------------------------------------------------
 # Detect options
@@ -168,11 +182,18 @@ c_options['use_avfoundation'] = platform in ['darwin', 'ios']
 c_options['use_osx_frameworks'] = platform == 'darwin'
 c_options['debug_gl'] = False
 
+# Set the alpha size, this will be 0 on the Raspberry Pi and 8 on all other
+# platforms, so SDL2 works without X11
+c_options['kivy_sdl_gl_alpha_size'] = 8 if pi_version is None else 0
+
 # now check if environ is changing the default values
 for key in list(c_options.keys()):
     ukey = key.upper()
     if ukey in environ:
-        value = bool(int(environ[ukey]))
+        # kivy_sdl_gl_alpha_size should be an integer, the rest are booleans
+        value = int(environ[ukey])
+        if key != 'kivy_sdl_gl_alpha_size':
+            value = bool(value)
         print('Environ change {0} -> {1}'.format(key, value))
         c_options[key] = value
 
@@ -183,22 +204,19 @@ use_embed_signature = use_embed_signature or bool(
 # -----------------------------------------------------------------------------
 # We want to be able to install kivy as a wheel without a dependency
 # on cython, but we also want to use cython where possible as a setup
-# time dependency through `setup_requires` if building from source.
+# time dependency through `pyproject.toml` if building from source.
 
 # There are issues with using cython at all on some platforms;
 # exclude them from using or declaring cython.
 
 # This determines whether Cython specific functionality may be used.
 can_use_cython = True
-# This sets whether or not Cython gets added to setup_requires.
-declare_cython = False
 
 if platform in ('ios', 'android'):
     # NEVER use or declare cython on these platforms
     print('Not using cython on %s' % platform)
     can_use_cython = False
-else:
-    declare_cython = True
+
 
 # -----------------------------------------------------------------------------
 # Setup classes
@@ -207,6 +225,11 @@ else:
 src_path = build_path = dirname(__file__)
 print("Current directory is: {}".format(os.getcwd()))
 print("Source and initial build directory is: {}".format(src_path))
+
+# __version__ is imported by exec, but help linter not complain
+__version__ = None
+with open(join(src_path, 'kivy', '_version.py'), encoding="utf-8") as f:
+    exec(f.read())
 
 
 class KivyBuildExt(build_ext, object):
@@ -234,11 +257,22 @@ class KivyBuildExt(build_ext, object):
 
     def finalize_options(self):
         retval = super(KivyBuildExt, self).finalize_options()
+
+        # Build the extensions in parallel if the options has not been set
+        if hasattr(self, 'parallel') and self.parallel is None:
+            # Use a maximum of 4 cores. If cpu_count returns None, then parallel
+            # build will be disabled
+            self.parallel = min(4, os.cpu_count() or 0)
+            if self.parallel:
+                print('Building extensions in parallel using {} cores'.format(
+                    self.parallel))
+
         global build_path
         if (self.build_lib is not None and exists(self.build_lib) and
                 not self.inplace):
             build_path = self.build_lib
             print("Updated build directory to: {}".format(build_path))
+
         return retval
 
     def build_extensions(self):
@@ -262,7 +296,9 @@ class KivyBuildExt(build_ext, object):
         # generate content
         print('Build configuration is:')
         for opt, value in c_options.items():
-            value = int(bool(value))
+            # kivy_sdl_gl_alpha_size is already an integer
+            if opt != 'kivy_sdl_gl_alpha_size':
+                value = int(bool(value))
             print(' * {0} = {1}'.format(opt, value))
             opt = opt.upper()
             config_h += '#define __{0} {1}\n'.format(opt, value)
@@ -410,15 +446,6 @@ if platform == 'ios':
 elif platform == 'android':
     c_options['use_android'] = True
 
-elif platform == 'darwin':
-    if c_options['use_osx_frameworks']:
-        if osx_arch == "i386":
-            print("Warning: building with frameworks fail on i386")
-        else:
-            print("OSX framework used, force to x86_64 only")
-            environ["ARCHFLAGS"] = environ.get("ARCHFLAGS", "-arch x86_64")
-            print("OSX ARCHFLAGS are: {}".format(environ["ARCHFLAGS"]))
-
 # detect gstreamer, only on desktop
 # works if we forced the options or in autodetection
 if platform not in ('ios', 'android') and (c_options['use_gstreamer']
@@ -449,12 +476,17 @@ if platform not in ('ios', 'android') and (c_options['use_gstreamer']
             print('GStreamer found via pkg-config')
             gstreamer_valid = True
             c_options['use_gstreamer'] = True
-        elif exists(join(get_paths()['include'], 'gst', 'gst.h')):
-            print('GStreamer found via gst.h')
-            gstreamer_valid = True
-            c_options['use_gstreamer'] = True
-            gst_flags = {
-                'libraries': ['gstreamer-1.0', 'glib-2.0', 'gobject-2.0']}
+        else:
+            _includes = get_isolated_env_paths()[0] + [get_paths()['include']]
+            for include_dir in _includes:
+                if exists(join(include_dir, 'gst', 'gst.h')):
+                    print('GStreamer found via gst.h')
+                    gstreamer_valid = True
+                    c_options['use_gstreamer'] = True
+                    gst_flags = {
+                        'libraries':
+                            ['gstreamer-1.0', 'glib-2.0', 'gobject-2.0']}
+                    break
 
     if not gstreamer_valid:
         # use pkg-config approach instead
@@ -467,25 +499,43 @@ if platform not in ('ios', 'android') and (c_options['use_gstreamer']
 # detect SDL2, only on desktop and iOS, or android if explicitly enabled
 # works if we forced the options or in autodetection
 sdl2_flags = {}
-if c_options['use_sdl2'] or (
-        platform not in ('android',) and c_options['use_sdl2'] is None):
+sdl2_source = None
+if platform == 'win32' and c_options['use_sdl2'] is None:
+    c_options['use_sdl2'] = True
+
+can_autodetect_sdl2 = (
+    platform not in ("android",) and c_options["use_sdl2"] is None
+)
+if c_options['use_sdl2'] or can_autodetect_sdl2:
 
     sdl2_valid = False
     if c_options['use_osx_frameworks'] and platform == 'darwin':
         # check the existence of frameworks
+        if KIVY_DEPS_ROOT:
+            default_sdl2_frameworks_search_path = join(
+                KIVY_DEPS_ROOT, "dist", "Frameworks"
+            )
+        else:
+            default_sdl2_frameworks_search_path = "/Library/Frameworks"
+        sdl2_frameworks_search_path = environ.get(
+            "KIVY_SDL2_FRAMEWORKS_SEARCH_PATH",
+            default_sdl2_frameworks_search_path
+        )
         sdl2_valid = True
+
         sdl2_flags = {
             'extra_link_args': [
-                '-F/Library/Frameworks',
+                '-F{}'.format(sdl2_frameworks_search_path),
                 '-Xlinker', '-rpath',
-                '-Xlinker', '/Library/Frameworks',
+                '-Xlinker', sdl2_frameworks_search_path,
                 '-Xlinker', '-headerpad',
                 '-Xlinker', '190'],
             'include_dirs': [],
-            'extra_compile_args': ['-F/Library/Frameworks']
+            'extra_compile_args': ['-F{}'.format(sdl2_frameworks_search_path)]
         }
+
         for name in ('SDL2', 'SDL2_ttf', 'SDL2_image', 'SDL2_mixer'):
-            f_path = '/Library/Frameworks/{}.framework'.format(name)
+            f_path = '{}/{}.framework'.format(sdl2_frameworks_search_path, name)
             if not exists(f_path):
                 print('Missing framework {}'.format(f_path))
                 sdl2_valid = False
@@ -501,6 +551,7 @@ if c_options['use_sdl2'] or (
             print('SDL2 frameworks not found, fallback on pkg-config')
         else:
             c_options['use_sdl2'] = True
+            sdl2_source = 'macos-frameworks'
             print('Activate SDL2 compilation')
 
     if not sdl2_valid and platform != "ios":
@@ -509,22 +560,11 @@ if c_options['use_sdl2'] or (
         if 'libraries' in sdl2_flags:
             print('SDL2 found via pkg-config')
             c_options['use_sdl2'] = True
+            sdl2_source = 'pkg-config'
 
 
 # -----------------------------------------------------------------------------
 # declare flags
-
-
-def get_modulename_from_file(filename):
-    filename = filename.replace(sep, '/')
-    pyx = '.'.join(filename.split('.')[:-1])
-    pyxl = pyx.split('/')
-    while pyxl[0] != 'kivy':
-        pyxl.pop(0)
-    if pyxl[1] == 'kivy':
-        pyxl.pop(0)
-    return '.'.join(pyxl)
-
 
 def expand(root, *args):
     return join(root, 'kivy', *args)
@@ -560,10 +600,12 @@ def merge(d1, *args):
 
 
 def determine_base_flags():
+    includes, libs = get_isolated_env_paths()
+
     flags = {
         'libraries': [],
-        'include_dirs': [join(src_path, 'kivy', 'include')],
-        'library_dirs': [],
+        'include_dirs': [join(src_path, 'kivy', 'include')] + includes,
+        'library_dirs': [] + libs,
         'extra_link_args': [],
         'extra_compile_args': []}
     if c_options['use_ios']:
@@ -578,21 +620,24 @@ def determine_base_flags():
             environ.get('LOCALBASE', '/usr/local'), 'include')]
         flags['library_dirs'] += [join(
             environ.get('LOCALBASE', '/usr/local'), 'lib')]
-    elif platform == 'darwin':
+    elif platform == 'darwin' and c_options['use_osx_frameworks']:
         v = os.uname()
         if v[2] >= '13.0.0':
-            # use xcode-select to search on the right Xcode path
-            # XXX use the best SDK available instead of a specific one
-            import platform as _platform
-            xcode_dev = getoutput('xcode-select -p').splitlines()[0]
-            sdk_mac_ver = '.'.join(_platform.mac_ver()[0].split('.')[:2])
-            print('Xcode detected at {}, and using OS X{} sdk'.format(
-                xcode_dev, sdk_mac_ver))
-            sysroot = join(
-                xcode_dev.decode('utf-8'),
-                'Platforms/MacOSX.platform/Developer/SDKs',
-                'MacOSX{}.sdk'.format(sdk_mac_ver),
-                'System/Library/Frameworks')
+            if 'SDKROOT' in environ:
+                sysroot = join(environ['SDKROOT'], 'System/Library/Frameworks')
+            else:
+                # use xcode-select to search on the right Xcode path
+                # XXX use the best SDK available instead of a specific one
+                import platform as _platform
+                xcode_dev = getoutput('xcode-select -p').splitlines()[0]
+                sdk_mac_ver = '.'.join(_platform.mac_ver()[0].split('.')[:2])
+                print('Xcode detected at {}, and using OS X{} sdk'.format(
+                    xcode_dev, sdk_mac_ver))
+                sysroot = join(
+                    xcode_dev.decode('utf-8'),
+                    'Platforms/MacOSX.platform/Developer/SDKs',
+                    'MacOSX{}.sdk'.format(sdk_mac_ver),
+                    'System/Library/Frameworks')
         else:
             sysroot = ('/System/Library/Frameworks/'
                        'ApplicationServices.framework/Frameworks')
@@ -618,8 +663,7 @@ def determine_gl_flags():
         flags['libraries'] = ['GLESv2']
         flags['extra_link_args'] = ['-framework', 'OpenGLES']
     elif platform == 'darwin':
-        flags['extra_link_args'] = ['-framework', 'OpenGL', '-arch', osx_arch]
-        flags['extra_compile_args'] = ['-arch', osx_arch]
+        flags['extra_link_args'] = ['-framework', 'OpenGL']
     elif platform.startswith('freebsd'):
         flags['libraries'] = ['GL']
     elif platform.startswith('openbsd'):
@@ -654,12 +698,12 @@ def determine_gl_flags():
                 cross_sysroot + '/usr/lib/libbrcmGLESv2.so')
 
         if all((exists(lib) for lib in brcm_lib_files)):
-            print('Found brcmEGL and brcmGLES library files'
+            print('Found brcmEGL and brcmGLES library files '
                   'for rpi platform at ' + dirname(brcm_lib_files[0]))
             gl_libs = ['brcmEGL', 'brcmGLESv2']
         else:
             print(
-                'Failed to find brcmEGL and brcmGLESv2 library files'
+                'Failed to find brcmEGL and brcmGLESv2 library files '
                 'for rpi platform, falling back to EGL and GLESv2.')
             gl_libs = ['EGL', 'GLESv2']
         flags['libraries'] = ['bcm_host'] + gl_libs
@@ -679,21 +723,40 @@ def determine_sdl2():
     if not c_options['use_sdl2']:
         return flags
 
-    sdl2_path = environ.get('KIVY_SDL2_PATH', None)
-
-    if sdl2_flags and not sdl2_path and platform == 'darwin':
+    # If darwin has already been configured with frameworks, don't
+    # configure sdl2 via libs.
+    # TODO: Move framework configuration here.
+    if sdl2_source == "macos-frameworks":
         return sdl2_flags
+
+    default_sdl2_path = None
+
+    if KIVY_DEPS_ROOT:
+
+        default_sdl2_path = os.pathsep.join(
+            [
+                join(KIVY_DEPS_ROOT, "dist", "lib"),
+                join(KIVY_DEPS_ROOT, "dist", "include", "SDL2"),
+            ]
+        )
+
+    kivy_sdl2_path = environ.get('KIVY_SDL2_PATH', default_sdl2_path)
+
+    includes, _ = get_isolated_env_paths()
 
     # no pkgconfig info, or we want to use a specific sdl2 path, so perform
     # manual configuration
     flags['libraries'] = ['SDL2', 'SDL2_ttf', 'SDL2_image', 'SDL2_mixer']
-    split_chr = ';' if platform == 'win32' else ':'
-    sdl2_paths = sdl2_path.split(split_chr) if sdl2_path else []
+
+    sdl2_paths = kivy_sdl2_path.split(os.pathsep) if kivy_sdl2_path else []
 
     if not sdl2_paths:
-        sdl_inc = join(sys.prefix, 'include', 'SDL2')
-        if isdir(sdl_inc):
-            sdl2_paths = [sdl_inc]
+        # Try to find sdl2 in default locations if we don't have a custom path
+        sdl2_paths = []
+        for include in includes + [join(sys.prefix, 'include')]:
+            sdl_inc = join(include, 'SDL2')
+            if isdir(sdl_inc):
+                sdl2_paths.append(sdl_inc)
         sdl2_paths.extend(['/usr/local/include/SDL2', '/usr/include/SDL2'])
 
     flags['include_dirs'] = sdl2_paths
@@ -702,6 +765,16 @@ def determine_sdl2():
     flags['library_dirs'] = (
         sdl2_paths if sdl2_paths else
         ['/usr/local/lib/'])
+
+    if kivy_sdl2_path:
+        # If we have a custom path, we need to add the rpath to the linker
+        # so that the libraries can be found and loaded without having to
+        # set LD_LIBRARY_PATH every time.
+        flags["extra_link_args"] = [
+            f"-Wl,-rpath,{l_path}"
+            for l_path in sdl2_paths
+            if l_path.endswith("lib")
+        ]
 
     if sdl2_flags:
         flags = merge(flags, sdl2_flags)
@@ -737,6 +810,9 @@ gl_flags, gl_flags_base = determine_gl_flags()
 # all the dependencies have been found manually with:
 # grep -inr -E '(cimport|include)' kivy/graphics/context_instructions.{pxd,pyx}
 graphics_dependencies = {
+    'boxshadow.pxd': ['fbo.pxd', 'context_instructions.pxd',
+                      'vertex_instructions.pxd'],
+    'boxshadow.pyx': ['fbo.pxd', 'context_instructions.pxd'],
     'buffer.pyx': ['common.pxi'],
     'context.pxd': ['instructions.pxd', 'texture.pxd', 'vbo.pxd', 'cgl.pxd'],
     'cgl.pxd': ['common.pxi', 'config.pxi', 'gl_redirect.h'],
@@ -798,7 +874,9 @@ sources = {
     '_event.pyx': merge(base_flags, {'depends': ['properties.pxd']}),
     '_clock.pyx': {},
     'weakproxy.pyx': {},
-    'properties.pyx': merge(base_flags, {'depends': ['_event.pxd']}),
+    'properties.pyx': merge(
+        base_flags, {'depends': ['_event.pxd', '_metrics.pxd']}),
+    '_metrics.pyx': merge(base_flags, {'depends': ['_event.pxd']}),
     'graphics/buffer.pyx': merge(base_flags, gl_flags_base),
     'graphics/context.pyx': merge(base_flags, gl_flags_base),
     'graphics/compiler.pyx': merge(base_flags, gl_flags_base),
@@ -836,7 +914,8 @@ sources = {
             'lib/libtess2/Source/tess.c'
         ]
     }),
-    'graphics/svg.pyx': merge(base_flags, gl_flags_base)
+    'graphics/svg.pyx': merge(base_flags, gl_flags_base),
+    'graphics/boxshadow.pyx': merge(base_flags, gl_flags_base)
 }
 
 if c_options["use_sdl2"]:
@@ -970,23 +1049,23 @@ def get_extensions_from_sources(sources):
         return ext_modules
     for pyx, flags in sources.items():
         is_graphics = pyx.startswith('graphics')
-        pyx = expand(src_path, pyx)
+        pyx_path = expand(src_path, pyx)
         depends = [expand(src_path, x) for x in flags.pop('depends', [])]
         c_depends = [expand(src_path, x) for x in flags.pop('c_depends', [])]
         if not can_use_cython:
             # can't use cython, so use the .c files instead.
-            pyx = '%s.c' % pyx[:-4]
+            pyx_path = '%s.c' % pyx_path[:-4]
         if is_graphics:
-            depends = resolve_dependencies(pyx, depends)
+            depends = resolve_dependencies(pyx_path, depends)
         f_depends = [x for x in depends if x.rsplit('.', 1)[-1] in (
             'c', 'cpp', 'm')]
-        module_name = get_modulename_from_file(pyx)
+        module_name = '.'.join(['kivy'] + pyx[:-4].split('/'))
         flags_clean = {'depends': depends}
         for key, value in flags.items():
             if len(value):
                 flags_clean[key] = value
         ext_modules.append(CythonExtension(
-            module_name, [pyx] + f_depends + c_depends, **flags_clean))
+            module_name, [pyx_path] + f_depends + c_depends, **flags_clean))
     return ext_modules
 
 
@@ -1036,18 +1115,15 @@ def glob_paths(*patterns, excludes=('.pyc', )):
 # -----------------------------------------------------------------------------
 # setup !
 if not build_examples:
-    install_requires = [
-        'Kivy-Garden>=0.1.4', 'docutils', 'pygments'
-    ]
-    setup_requires = []
-    if declare_cython:
-        setup_requires.append(CYTHON_REQUIRES_STRING)
     setup(
         name='Kivy',
-        version=get_version(),
+        version=__version__,
         author='Kivy Team and other contributors',
         author_email='kivy-dev@googlegroups.com',
         url='http://kivy.org',
+        project_urls={
+            'Source': 'https://github.com/kivy/kivy',
+        },
         license='MIT',
         description=(
             'A software library for rapid development of '
@@ -1060,6 +1136,7 @@ if not build_examples:
         package_dir={'kivy': 'kivy'},
         package_data={
             'kivy':
+                glob_paths('*.pxd', '*.pxi') +
                 glob_paths('**/*.pxd', '**/*.pxi') +
                 glob_paths('data/**/*.*') +
                 glob_paths('include/**/*.*') +
@@ -1086,9 +1163,10 @@ if not build_examples:
             'Operating System :: Microsoft :: Windows',
             'Operating System :: POSIX :: BSD :: FreeBSD',
             'Operating System :: POSIX :: Linux',
-            'Programming Language :: Python :: 3.5',
-            'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
+            'Programming Language :: Python :: 3.9',
+            'Programming Language :: Python :: 3.10',
             'Topic :: Artistic Software',
             'Topic :: Games/Entertainment',
             'Topic :: Multimedia :: Graphics :: 3D Rendering',
@@ -1101,18 +1179,11 @@ if not build_examples:
             'Topic :: Scientific/Engineering :: Visualization',
             ('Topic :: Software Development :: Libraries :: '
              'Application Frameworks'),
-            'Topic :: Software Development :: User Interfaces'],
-        dependency_links=[
-            'https://github.com/kivy-garden/garden/archive/master.zip'],
-        install_requires=install_requires,
-        setup_requires=setup_requires,
-        extras_require={
-            'tuio': ['oscpy']
-        })
+            'Topic :: Software Development :: User Interfaces'])
 else:
     setup(
         name='Kivy-examples',
-        version=get_version(),
+        version=__version__,
         author='Kivy Team and other contributors',
         author_email='kivy-dev@googlegroups.com',
         url='http://kivy.org',

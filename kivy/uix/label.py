@@ -4,14 +4,13 @@
 .. image:: images/label.png
     :align: right
 
-The :class:`Label` widget is for rendering text. It supports ascii and unicode
-strings::
+The :class:`Label` widget is for rendering text::
 
     # hello world text
     l = Label(text='Hello world')
 
     # unicode text; can only display glyphs that are available in the font
-    l = Label(text=u'Hello world ' + unichr(2764))
+    l = Label(text='Hello world ' + chr(2764))
 
     # multiline text
     l = Label(text='Multi\\nLine')
@@ -287,7 +286,7 @@ from kivy.core.text import Label as CoreLabel, DEFAULT_FONT
 from kivy.core.text.markup import MarkupLabel as CoreMarkupLabel
 from kivy.properties import StringProperty, OptionProperty, \
     NumericProperty, BooleanProperty, ReferenceListProperty, \
-    ListProperty, ObjectProperty, DictProperty
+    ListProperty, ObjectProperty, DictProperty, ColorProperty
 from kivy.utils import get_hex_from_color
 
 
@@ -302,7 +301,8 @@ class Label(Widget):
 
     __events__ = ['on_ref_press']
 
-    _font_properties = ('text', 'font_size', 'font_name', 'bold', 'italic',
+    _font_properties = ('text', 'font_size', 'font_name', 'font_script_name',
+                        'font_direction', 'bold', 'italic',
                         'underline', 'strikethrough', 'font_family', 'color',
                         'disabled_color', 'halign', 'valign', 'padding_x',
                         'padding_y', 'outline_width', 'disabled_outline_color',
@@ -341,8 +341,12 @@ class Label(Widget):
         if (markup and cls is not CoreMarkupLabel) or \
            (not markup and cls is not CoreLabel):
             # markup have change, we need to change our rendering method.
-            d = Label._font_properties
-            dkw = dict(list(zip(d, [getattr(self, x) for x in d])))
+            dkw = {x: getattr(self, x) for x in self._font_properties}
+            dkw['usersize'] = self.text_size
+            if self.disabled:
+                dkw['color'] = self.disabled_color
+                dkw['outline_color'] = self.disabled_outline_color
+
             if markup:
                 self._label = CoreMarkupLabel(**dkw)
             else:
@@ -441,14 +445,18 @@ class Label(Widget):
     # Properties
     #
 
-    disabled_color = ListProperty([1, 1, 1, .3])
+    disabled_color = ColorProperty([1, 1, 1, .3])
     '''The color of the text when the widget is disabled, in the (r, g, b, a)
     format.
 
     .. versionadded:: 1.8.0
 
-    :attr:`disabled_color` is a :class:`~kivy.properties.ListProperty` and
+    :attr:`disabled_color` is a :class:`~kivy.properties.ColorProperty` and
     defaults to [1, 1, 1, .3].
+
+    .. versionchanged:: 2.0.0
+        Changed from :class:`~kivy.properties.ListProperty` to
+        :class:`~kivy.properties.ColorProperty`.
     '''
 
     text = StringProperty('')
@@ -457,10 +465,6 @@ class Label(Widget):
     Creation of a simple hello world::
 
         widget = Label(text='Hello world')
-
-    If you want to create the widget with an unicode string, use::
-
-        widget = Label(text=u'My unicode string')
 
     :attr:`text` is a :class:`~kivy.properties.StringProperty` and defaults to
     ''.
@@ -543,7 +547,7 @@ class Label(Widget):
     you can load the system fonts by specifying a font context starting
     with the special string `system://`. This will load the system
     fontconfig configuration, and add your application-specific fonts on
-    top of it (this imposes a signifficant risk of family name collision,
+    top of it (this imposes a significant risk of family name collision,
     Pango may not use your custom font file, but pick one from the system)
 
     .. note::
@@ -601,6 +605,50 @@ class Label(Widget):
     defaults to 'Roboto'. This value is taken
     from :class:`~kivy.config.Config`.
     '''
+
+    font_script_name = OptionProperty('Latn', options=['Zyyy', 'Latn', 'Hani',
+                'Cyrl', 'Hira', 'Kana', 'Thai', 'Arab', 'Hang', 'Deva', 'Grek',
+                'Hebr', 'Taml', 'Knda', 'Geor', 'Mlym', 'Telu', 'Mymr', 'Gujr',
+                'Beng', 'Guru', 'Laoo', 'Zinh', 'Khmr', 'Tibt', 'Sinh', 'Ethi',
+                'Thaa', 'Orya', 'Zzzz', 'Cans', 'Syrc', 'Bopo', 'Nkoo', 'Cher',
+                'Yiii', 'Samr', 'Copt', 'Mong', 'Glag', 'Vaii', 'Bali', 'Tfng',
+                'Bamu', 'Batk', 'Cham', 'Java', 'Kali', 'Lepc', 'Limb', 'Lisu',
+                'Mand', 'Mtei', 'Talu', 'Olck', 'Saur', 'Sund', 'Sylo', 'Tale',
+                'Lana', 'Avst', 'Brah', 'Bugi', 'Buhd', 'Cari', 'Xsux', 'Cprt',
+                'Dsrt', 'Egyp', 'Goth', 'Hano', 'Armi', 'Phli', 'Prti', 'Kthi',
+                'Khar', 'Linb', 'Lyci', 'Lydi', 'Ogam', 'Ital', 'Xpeo', 'Sarb',
+                'Orkh', 'Osma', 'Phag', 'Phnx', 'Rjng', 'Runr', 'Shaw', 'Tglg',
+                'Tagb', 'Ugar', 'Cakm', 'Merc', 'Mero', 'Plrd', 'Shrd', 'Sora',
+                'Takr', 'Brai', 'Aghb', 'Bass', 'Dupl', 'Elba', 'Gran', 'Khoj',
+                'Lina', 'Mahj', 'Mani', 'Modi', 'Mroo', 'Narb', 'Nbat', 'Palm',
+                'Pauc', 'Perm', 'Phlp', 'Sidd', 'Sind', 'Tirh', 'Wara', 'Ahom',
+                'Hluw', 'Hatr', 'Mult', 'Hung', 'Sgnw', 'Adlm', 'Bhks', 'Marc',
+                'Osge', 'Tang', 'Newa', 'Gonm', 'Nshu', 'Soyo', 'Zanb', 'Dogr',
+                'Gong', 'Rohg', 'Maka', 'Medf', 'Sogo', 'Sogd', 'Elym', 'Hmnp',
+                'Nand', 'Wcho', 'Chrs', 'Diak', 'Kits', 'Yezi', 'Cpmn', 'Ougr',
+                'Tnsa', 'Toto', 'Vith', 'Kawi', 'Nagm'])
+    '''`script_code` from https://bit.ly/TypeScriptCodes .
+
+    .. versionadded:: 2.2.0
+
+    .. warning::
+
+        font_script_name is only currently supported in SDL2 ttf providers.
+
+
+    :attr:`font_script_name` is a :class:`~kivy.properties.OptionProperty` and
+    defaults to 'Latn'.
+    '''
+
+    font_direction = OptionProperty('ltr', options=['rtl', 'ltr', 'ttb', 'btt'])
+    '''Direction for the specific font, can be one of `ltr`, `rtl`, `ttb`,`btt`.
+
+    font_direction currently only works with SDL2 ttf providers.
+
+    .. versionadded:: 2.2.0
+
+    :attr:`font_direction` is a :class:`~kivy.properties.OptionProperty` and
+    defults to 'ltr'. '''
 
     font_size = NumericProperty('15sp')
     '''Font size of the text, in pixels.
@@ -755,11 +803,15 @@ class Label(Widget):
         or set a :attr:`text_size` to change this behavior.
     '''
 
-    color = ListProperty([1, 1, 1, 1])
+    color = ColorProperty([1, 1, 1, 1])
     '''Text color, in the format (r, g, b, a).
 
-    :attr:`color` is a :class:`~kivy.properties.ListProperty` and defaults to
+    :attr:`color` is a :class:`~kivy.properties.ColorProperty` and defaults to
     [1, 1, 1, 1].
+
+    .. versionchanged:: 2.0.0
+        Changed from :class:`~kivy.properties.ListProperty` to
+        :class:`~kivy.properties.ColorProperty`.
     '''
 
     outline_width = NumericProperty(None, allownone=True)
@@ -775,7 +827,7 @@ class Label(Widget):
     defaults to None.
     '''
 
-    outline_color = ListProperty([0, 0, 0])
+    outline_color = ColorProperty([0, 0, 0, 1])
     '''The color of the text outline, in the (r, g, b) format.
 
     .. note::
@@ -783,11 +835,16 @@ class Label(Widget):
 
     .. versionadded:: 1.10.0
 
-    :attr:`outline_color` is a :class:`~kivy.properties.ListProperty` and
-    defaults to [0, 0, 0].
+    :attr:`outline_color` is a :class:`~kivy.properties.ColorProperty` and
+    defaults to [0, 0, 0, 1].
+
+    .. versionchanged:: 2.0.0
+        Changed from :class:`~kivy.properties.ListProperty` to
+        :class:`~kivy.properties.ColorProperty`. Alpha component is ignored
+        and assigning value to it has no effect.
     '''
 
-    disabled_outline_color = ListProperty([0, 0, 0])
+    disabled_outline_color = ColorProperty([0, 0, 0, 1])
     '''The color of the text outline when the widget is disabled, in the
     (r, g, b) format.
 
@@ -796,8 +853,13 @@ class Label(Widget):
 
     .. versionadded:: 1.10.0
 
-    :attr:`disabled_outline_color` is a :class:`~kivy.properties.ListProperty`
+    :attr:`disabled_outline_color` is a :class:`~kivy.properties.ColorProperty`
     and defaults to [0, 0, 0].
+
+    .. versionchanged:: 2.0.0
+        Changed from :class:`~kivy.properties.ListProperty` to
+        :class:`~kivy.properties.ColorProperty`. Alpha component is ignored
+        and assigning value to it has no effect.
     '''
 
     texture = ObjectProperty(None, allownone=True)
@@ -973,7 +1035,7 @@ class Label(Widget):
         {'hello': ((64, 0, 78, 16), )}
 
     The references marked "hello" have a bounding box at (x1, y1, x2, y2).
-    These co-ordinates are relative to the top left corner of the text, with
+    These coordinates are relative to the top left corner of the text, with
     the y value increasing downwards. You can define multiple refs with the
     same name: each occurrence will be added as another (x1, y1, x2, y2) tuple
     to this list.
@@ -987,7 +1049,7 @@ class Label(Widget):
         def print_it(instance, value):
             print('User click on', value)
         widget = Label(text='Hello [ref=world]World[/ref]', markup=True)
-        widget.on_ref_press(print_it)
+        widget.bind(on_ref_press=print_it)
 
     .. note::
 
@@ -1000,7 +1062,7 @@ class Label(Widget):
     .. versionadded:: 1.1.0
 
     Position of all the ``[anchor=xxx]`` markup in the text.
-    These co-ordinates are relative to the top left corner of the text, with
+    These coordinates are relative to the top left corner of the text, with
     the y value increasing downwards. Anchors names should be unique and only
     the first occurrence of any duplicate anchors will be recorded.
 

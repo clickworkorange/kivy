@@ -401,19 +401,19 @@ template instead, like so:
 
 .. code-block:: kv
 
-    <MyBigButt@Button>:
+    <MyBigButton@Button>:
         text_size: self.size
         font_size: '25sp'
         markup: True
 
     <MyWidget>:
-        MyBigButt:
+        MyBigButton:
             text: "Hello world, watch this text wrap inside the button"
-        MyBigButt:
+        MyBigButton:
             text: "Even absolute is relative to itself"
-        MyBigButt:
+        MyBigButton:
             text: "repeating the same thing over and over in a comp = fail"
-        MyBigButt:
+        MyBigButton:
 
 This class, created just by the declaration of this rule, inherits from the
 Button class and allows us to change default values and create bindings for all
@@ -472,10 +472,10 @@ declaration will have the same kv properties.
 Designing with the Kivy Language
 --------------------------------
 
-One of aims of the Kivy language is to
+One of the aims of the Kivy language is to
 `separate the concerns <https://en.wikipedia.org/wiki/Separation_of_concerns>`_
 of presentation and logic. The presentation (layout) side is addressed by your
-kv file and the logic by your .py file.
+``.kv`` file and the logic by your ``.py`` file.
 
 The code goes in py files
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -487,8 +487,8 @@ Let's start with a little example: a Python file named `main.py`:
 
 In this example, we are creating a Controller class with 2 properties:
 
-    * ``info`` for receving some text
-    * ``label_wid`` for receving the label widget
+    * ``info`` for receiving some text
+    * ``label_wid`` for receiving the label widget
 
 In addition, we are creating a ``do_action()`` method that will use both of
 these properties. It will change the ``info`` text and change text in the
@@ -506,7 +506,6 @@ what files are loaded is described in the :meth:`kivy.app.App.load_kv` method.
 
 .. literalinclude:: ../../../examples/guide/designwithkv/controller.kv
     :language: kv
-    :linenos:
 
 One label and one button in a vertical ``BoxLayout``. Seems very simple. There
 are 3 things going on here:
@@ -525,7 +524,7 @@ are 3 things going on here:
     3. Creating a custom callback in the ``Button`` using the ``Controller``'s
        ``on_press`` method.
 
-        * ``root`` and ``self`` are reserved keywords, useable anywhere.
+        * ``root`` and ``self`` are reserved keywords, usable anywhere.
           ``root`` represents the top widget in the rule and ``self`` represents
           the current widget.
 
@@ -539,3 +538,8 @@ are 3 things going on here:
 
 And that's that. Now when we run `main.py`, `controller.kv` will be loaded so
 that the ``Button`` and ``Label`` will show up and respond to our touch events.
+
+More documentation
+------------------
+For a full description of the different components of the `KV` language,
+advanced usage and limitations, see the documentation for :mod:`~kivy.lang`

@@ -188,7 +188,7 @@ class ImageData(object):
         '''
         if level == 0:
             return (self.width, self.height, self.data, self.rowlength)
-        assert(level < len(self.mipmaps))
+        assert level < len(self.mipmaps)
         return self.mipmaps[level]
 
     def iterate_mipmaps(self):
@@ -424,7 +424,7 @@ class ImageLoader(object):
                 afn += '.atlas'
             afn = resource_find(afn)
             if not afn:
-                raise Exception('Unable to found %r atlas' % afn)
+                raise Exception('Unable to find %r atlas' % afn)
             atlas = Atlas(afn)
             Cache.append('kv.atlas', rfn, atlas)
             # first time, fill our texture cache.
@@ -987,8 +987,7 @@ else:
     image_libs += [('pygame', 'img_pygame')]
 image_libs += [
     ('ffpy', 'img_ffpyplayer'),
-    ('pil', 'img_pil'),
-    ('gif', 'img_gif')]
+    ('pil', 'img_pil')]
 
 libs_loaded = core_register_libs('image', image_libs)
 

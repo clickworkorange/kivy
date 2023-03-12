@@ -40,8 +40,8 @@ from kivy.logger import Logger
 from kivy.clock import Clock
 from kivy.cache import Cache
 from kivy.core.image import ImageLoader, Image
-from kivy.compat import PY2, string_types
 from kivy.config import Config
+from kivy.utils import platform
 
 from collections import deque
 from time import sleep
@@ -49,6 +49,7 @@ from os.path import join
 from os import write, close, unlink, environ
 import threading
 import mimetypes
+
 
 # Register a cache for loader
 Cache.register('kv.loader', limit=500, timeout=60)
@@ -66,7 +67,7 @@ class ProxyImage(Image):
             Fired when the image is loaded or changed.
         `on_error`
             Fired when the image cannot be loaded.
-            `error`: Exception data that ocurred
+            `error`: Exception data that occurred
     '''
 
     __events__ = ('on_load', 'on_error')
@@ -146,7 +147,7 @@ class LoaderBase(object):
     increase the number of workers, then all the images will be loaded faster,
     but the user will not been able to use the application while loading.
     Prior to 1.6.0, the default number was 20, and loading many full-hd images
-    was completly blocking the application.
+    was completely blocking the application.
 
     .. versionadded:: 1.6.0
     '''
@@ -180,12 +181,12 @@ class LoaderBase(object):
 
     def _get_loading_image(self):
         if not self._loading_image:
-            loading_png_fn = join(kivy_data_dir, 'images', 'image-loading.gif')
+            loading_png_fn = join(kivy_data_dir, 'images', 'image-loading.zip')
             self._loading_image = ImageLoader.load(filename=loading_png_fn)
         return self._loading_image
 
     def _set_loading_image(self, image):
-        if isinstance(image, string_types):
+        if isinstance(image, str):
             self._loading_image = ImageLoader.load(filename=image)
         else:
             self._loading_image = image
@@ -208,7 +209,7 @@ class LoaderBase(object):
         return self._error_image
 
     def _set_error_image(self, image):
-        if isinstance(image, string_types):
+        if isinstance(image, str):
             self._error_image = ImageLoader.load(filename=image)
         else:
             self._error_image = image
@@ -300,16 +301,9 @@ class LoaderBase(object):
     def _load_urllib(self, filename, kwargs):
         '''(internal) Loading a network file. First download it, save it to a
         temporary file, and pass it to _load_local().'''
-        if PY2:
-            import urllib2 as urllib_request
+        import urllib.request
+        import tempfile
 
-            def gettype(info):
-                return info.gettype()
-        else:
-            import urllib.request as urllib_request
-
-            def gettype(info):
-                return info.get_content_type()
         proto = filename.split(':', 1)[0]
         if proto == 'smb':
             try:
@@ -320,29 +314,38 @@ class LoaderBase(object):
                 Logger.warning(
                     'Loader: can not load PySMB: make sure it is installed')
                 return
-        import tempfile
+
         data = fd = _out_osfd = None
         try:
             _out_filename = ''
 
             if proto == 'smb':
                 # read from samba shares
-                fd = urllib_request.build_opener(SMBHandler).open(filename)
+                fd = urllib.request.build_opener(SMBHandler).open(filename)
             else:
                 # read from internet
-                request = urllib_request.Request(filename)
+                request = urllib.request.Request(filename)
                 if Config.has_option('network', 'useragent'):
                     useragent = Config.get('network', 'useragent')
                     if useragent:
                         request.add_header('User-Agent', useragent)
-                opener = urllib_request.build_opener()
-                fd = opener.open(request)
+
+                # A custom context is only needed on Android and iOS
+                # as we need to use the certs provided via certifi.
+                ssl_ctx = None
+                if platform in ['android', 'ios']:
+                    import certifi
+                    import ssl
+                    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+                    ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+
+                fd = urllib.request.urlopen(request, context=ssl_ctx)
 
             if '#.' in filename:
                 # allow extension override from URL fragment
                 suffix = '.' + filename.split('#.')[-1]
             else:
-                ctype = gettype(fd.info())
+                ctype = fd.info().get_content_type()
                 suffix = mimetypes.guess_extension(ctype)
                 suffix = LoaderBase.EXT_ALIAS.get(suffix, suffix)
                 if not suffix:
